@@ -130,11 +130,22 @@ clock_t _benchmark(void(*f)(inA, inB, out), void(*randA)(inA), void(*randB)(inB)
 #define benchmark(inA, inB, out, f, randA, randB) \
   cout << #f << ": " << _benchmark<inA, inB, out>(f, randA, randB) << endl
 
+inline void vec3adds(vec3d a, vec3d b, vec3d c) __attribute__((optimize("-O0")));
+
 inline
 void vec3adds(vec3d a, vec3d b, vec3d c) {
   for (int i = 0; i < 3; i++) {
     c[i] = a[i] + b[i];
   }
+}
+
+inline void vec3addsunroll(vec3d a, vec3d b, vec3d c) __attribute__((optimize("-O0")));
+
+inline
+void vec3addsunroll(vec3d a, vec3d b, vec3d c) {
+  c[0] = a[0] + b[0];
+  c[1] = a[1] + b[1];
+  c[2] = a[2] + b[2];
 }
 
 inline
@@ -159,6 +170,8 @@ void vec3addvaligned(vec4d a, vec4d b, vec4d c) {
   _mm256_store_pd(c, tempc);
 }
 
+inline void vec3dots(vec3d a, vec3d b, vec1d c) __attribute__((optimize("-O0")));
+
 inline
 void vec3dots(vec3d a, vec3d b, vec1d c) {
   double temp = 0;
@@ -166,6 +179,13 @@ void vec3dots(vec3d a, vec3d b, vec1d c) {
     temp += a[i] * b[i];
   }
   c[0] = temp;
+}
+
+inline void vec3dotsunroll(vec3d a, vec3d b, vec1d c) __attribute__((optimize("-O0")));
+
+inline
+void vec3dotsunroll(vec3d a, vec3d b, vec1d c) {
+  c[0] = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
 inline
@@ -198,6 +218,8 @@ void vec3dotv3(vec3d a, vec3d b, vec1d c) {
   _mm_maskstore_pd(c, _mm_set_epi64x(0, ULLONG_MAX), _mm_add_sd(hi, lo));
 }
 
+inline void vec3exts(vec3d a, vec3d b, mat33d c) __attribute__((optimize("-O0")));
+
 inline
 void vec3exts(vec3d a, vec3d b, mat33d c) {
   for (int i = 0; i < 3; i++) {
@@ -205,6 +227,21 @@ void vec3exts(vec3d a, vec3d b, mat33d c) {
       c[i][j] = a[i] * b[j];
     }
   }
+}
+
+inline void vec3extsunroll(vec3d a, vec3d b, mat33d c) __attribute__((optimize("-O0")));
+
+inline
+void vec3extsunroll(vec3d a, vec3d b, mat33d c) {
+  c[0][0] = a[0] * b[0];
+  c[0][1] = a[0] * b[1];
+  c[0][2] = a[0] * b[2];
+  c[1][0] = a[1] * b[0];
+  c[1][1] = a[1] * b[1];
+  c[1][2] = a[1] * b[2];
+  c[2][0] = a[2] * b[0];
+  c[2][1] = a[2] * b[1];
+  c[2][2] = a[2] * b[2];
 }
 
 inline
@@ -215,6 +252,8 @@ void vec3extv(vec3d a, vec3d b, mat33d c) {
   _mm256_storeu_pd(c[2], _mm256_mul_pd(_mm256_set1_pd(a[2]), temp));
 }
 
+inline void mat33vec3s(mat33d a, vec3d b, vec3d c) __attribute__((optimize("-O0")));
+
 inline
 void mat33vec3s(mat33d a, vec3d b, vec3d c) {
   for (int i = 0; i < 3; i++) {
@@ -224,6 +263,15 @@ void mat33vec3s(mat33d a, vec3d b, vec3d c) {
     }
     c[i] = temp;
   }
+}
+
+inline void mat33vec3sunroll(mat33d a, vec3d b, vec3d c) __attribute__((optimize("-O0")));
+
+inline
+void mat33vec3sunroll(mat33d a, vec3d b, vec3d c) {
+  c[0] = a[0][0] * b[0] + a[0][1] * b[1] + a[0][2] * b[2];
+  c[1] = a[1][0] * b[0] + a[1][1] * b[1] + a[1][2] * b[2];
+  c[2] = a[2][0] * b[0] + a[2][1] * b[1] + a[2][2] * b[2];
 }
 
 inline
@@ -282,25 +330,7 @@ void mat33vec3vfused2(mat33d a, vec3d b, vec3d c) {
   _mm256_maskstore_pd(c, mask0111, temp2);
 }
 
-inline
-void mat33vec3vbroadcast(mat33d _a, vec3d b, vec3d c) {
-
-  double *a = (double*) _a;
-  __m256d temp0 = _mm256_i64gather_pd(a, gatherMask036, 1);
-  __m256d tempb0 = _mm256_set1_pd(b[0]);
-  __m256d res0 = _mm256_mul_pd(temp0, tempb0);
-
-  __m256d temp1 = _mm256_i64gather_pd(a, gatherMask147, 1);
-  __m256d tempb1 = _mm256_set1_pd(b[1]);
-  __m256d res1 = _mm256_mul_pd(temp1, tempb1);
-
-  __m256d temp2 = _mm256_i64gather_pd(a, gatherMask258, 1);
-  __m256d tempb2 = _mm256_set1_pd(b[2]);
-  __m256d res2 = _mm256_mul_pd(temp2, tempb2);
-
-  __m256d res = _mm256_add_pd(res0, _mm256_add_pd(res1, res2));
-  _mm256_maskstore_pd(c, mask0111, res);
-}
+inline void mat33dmuls(mat33d a, mat33d b, mat33d c) __attribute__((optimize("-O0")));
 
 inline
 void mat33dmuls(mat33d a, mat33d b, mat33d c) {
@@ -313,6 +343,23 @@ void mat33dmuls(mat33d a, mat33d b, mat33d c) {
       c[i][j] = temp;
     }
   }
+}
+
+inline void mat33dmulsunroll(mat33d a, mat33d b, mat33d c) __attribute__((optimize("-O0")));
+
+inline
+void mat33dmulsunroll(mat33d a, mat33d b, mat33d c) {
+  c[0][0] = a[0][0] * b[0][0] + a[0][1] * b[1][0] + a[0][2] * b[2][0];
+  c[0][1] = a[0][0] * b[0][1] + a[0][1] * b[1][1] + a[0][2] * b[2][1];
+  c[0][2] = a[0][0] * b[0][2] + a[0][1] * b[1][2] + a[0][2] * b[2][2];
+
+  c[1][0] = a[1][0] * b[0][0] + a[1][1] * b[1][0] + a[1][2] * b[2][0];
+  c[1][1] = a[1][0] * b[0][1] + a[1][1] * b[1][1] + a[1][2] * b[2][1];
+  c[1][2] = a[1][0] * b[0][2] + a[1][1] * b[1][2] + a[1][2] * b[2][2];
+
+  c[2][0] = a[2][0] * b[0][0] + a[2][1] * b[1][0] + a[2][2] * b[2][0];
+  c[2][1] = a[2][0] * b[0][1] + a[2][1] * b[1][1] + a[2][2] * b[2][1];
+  c[2][2] = a[2][0] * b[0][2] + a[2][1] * b[1][2] + a[2][2] * b[2][2];
 }
 
 inline
@@ -377,39 +424,47 @@ int main (int argc, char **argv) {
   }
   init();
   cout << "verify\n"
+       << verify<vec4d, vec4d, vec4d>(vec3adds, vec3addsunroll, comp, rand, rand)
        << verify<vec4d, vec4d, vec4d>(vec3adds, vec3addv, comp, rand, rand)
        << verify<vec3d, vec3d, vec3d>(vec3adds, vec3addvmask, comp, rand, rand)
+       << verify<vec3d, vec3d, vec1d>(vec3dots, vec3dotsunroll, comp1, rand, rand)
        << verify<vec3d, vec3d, vec1d>(vec3dots, vec3dotv, comp1, rand, rand)
        << verify<vec3d, vec3d, vec1d>(vec3dots, vec3dotv2, comp1, rand, rand)
        << verify<vec3d, vec3d, vec1d>(vec3dots, vec3dotv3, comp1, rand, rand)
+       << verify<vec3d, vec3d, mat33d>(vec3exts, vec3extsunroll, comp, rand, rand)
        << verify<vec3d, vec3d, mat33d>(vec3exts, vec3extv, comp, rand, rand)
+       << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3sunroll, comp, rand, rand)
        << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vdot, comp, rand, rand)
        << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vfused1, comp, rand, rand)
        << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vfused2, comp, rand, rand)
-      // << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vbroadcast, comp, rand, rand)
-       << verify<mat33d, mat33d, mat33d>(mat33dmuls, mat33dmulvdot, comp, rand, rand);
-              ;
+       << verify<mat33d, mat33d, mat33d>(mat33dmuls, mat33dmulsunroll, comp, rand, rand)
+       << verify<mat33d, mat33d, mat33d>(mat33dmuls, mat33dmulvdot, comp, rand, rand)
+  ;
 
   cout << "\nbenchmark\n";
   benchmark(vec3d, vec3d, vec3d, vec3adds, rand, rand);
+  benchmark(vec3d, vec3d, vec3d, vec3addsunroll, rand, rand);
   benchmark(vec4d, vec4d, vec4d, vec3addv, rand, rand);
   benchmark(vec3d, vec3d, vec3d, vec3addvmask, rand, rand);
   cout << endl;
   benchmark(vec3d, vec3d, vec1d, vec3dots, rand, rand);
+  benchmark(vec3d, vec3d, vec1d, vec3dotsunroll, rand, rand);
   benchmark(vec3d, vec3d, vec1d, vec3dotv, rand, rand);
   benchmark(vec3d, vec3d, vec1d, vec3dotv2, rand, rand);
   benchmark(vec3d, vec3d, vec1d, vec3dotv3, rand, rand);
   cout << endl;
   benchmark(vec3d, vec3d, mat33d, vec3exts, rand, rand);
+  benchmark(vec3d, vec3d, mat33d, vec3extsunroll, rand, rand);
   benchmark(vec3d, vec3d, mat33d, vec3extv, rand, rand);
   cout << endl;
   benchmark(mat33d, vec3d, vec3d, mat33vec3s, rand, rand);
+  benchmark(mat33d, vec3d, vec3d, mat33vec3sunroll, rand, rand);
   benchmark(mat33d, vec3d, vec3d, mat33vec3vdot, rand, rand);
   benchmark(mat33d, vec3d, vec3d, mat33vec3vfused1, rand, rand);
   benchmark(mat33d, vec3d, vec3d, mat33vec3vfused2, rand, rand);
- // benchmark(mat33d, vec3d, vec3d, mat33vec3vbroadcast, rand, rand);
   cout << endl;
   benchmark(mat33d, mat33d, mat33d, mat33dmuls, rand, rand);
+  benchmark(mat33d, mat33d, mat33d, mat33dmulsunroll, rand, rand);
   benchmark(mat33d, mat33d, mat33d, mat33dmulvdot, rand, rand);
 
   fclose(dummyfile);
