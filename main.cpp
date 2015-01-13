@@ -302,13 +302,73 @@ void mat33vec3vbroadcast(mat33d _a, vec3d b, vec3d c) {
   _mm256_maskstore_pd(c, mask0111, res);
 }
 
+inline
+void mat33dmuls(mat33d a, mat33d b, mat33d c) {
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      double temp = 0;
+      for (int k = 0; k < 3; k++) {
+        temp += a[i][k] * b[k][j];
+      }
+      c[i][j] = temp;
+    }
+  }
+}
+
+inline
+void mat33dmulvdot(mat33d _a, mat33d _b, mat33d _c) {
+  double *a = (double*)_a;
+  double *b = (double*)_b;
+  double *c = (double*)_c;
+
+  __m256d a0 = _mm256_maskload_pd(a, mask0111);
+  __m256d a1 = _mm256_maskload_pd(a + 3, mask0111);
+  __m256d a2 = _mm256_maskload_pd(a + 6, mask0111);
+  __m256d b0 = _mm256_i64gather_pd(b, gatherMask036, 1);
+  __m256d b1 = _mm256_i64gather_pd(b, gatherMask147, 1);
+  __m256d b2 = _mm256_i64gather_pd(b, gatherMask258, 1);
+
+  {
+    __m256d temp0 = _mm256_mul_pd(a0, b0);
+    __m256d temp1 = _mm256_mul_pd(a0, b1);
+    __m256d temp2 = _mm256_mul_pd(a0, b2);
+    __m256d temp3 = _mm256_hadd_pd(temp0, temp1);
+    __m256d temp4 = _mm256_hadd_pd(temp2, temp2);
+    __m256d temp5 = _mm256_permute2f128_pd(temp3, temp4, 0b00100000);
+    __m256d temp6 = _mm256_permute2f128_pd(temp3, temp4, 0b00110001);
+    __m256d res = _mm256_add_pd(temp5, temp6);
+    _mm256_storeu_pd(c, res);
+  } {
+    __m256d temp0 = _mm256_mul_pd(a1, b0);
+    __m256d temp1 = _mm256_mul_pd(a1, b1);
+    __m256d temp2 = _mm256_mul_pd(a1, b2);
+    __m256d temp3 = _mm256_hadd_pd(temp0, temp1);
+    __m256d temp4 = _mm256_hadd_pd(temp2, temp2);
+    __m256d temp5 = _mm256_permute2f128_pd(temp3, temp4, 0b00100000);
+    __m256d temp6 = _mm256_permute2f128_pd(temp3, temp4, 0b00110001);
+    __m256d res = _mm256_add_pd(temp5, temp6);
+    _mm256_storeu_pd(c + 3, res);
+  } {
+    __m256d temp0 = _mm256_mul_pd(a2, b0);
+    __m256d temp1 = _mm256_mul_pd(a2, b1);
+    __m256d temp2 = _mm256_mul_pd(a2, b2);
+    __m256d temp3 = _mm256_hadd_pd(temp0, temp1);
+    __m256d temp4 = _mm256_hadd_pd(temp2, temp2);
+    __m256d temp5 = _mm256_permute2f128_pd(temp3, temp4, 0b00100000);
+    __m256d temp6 = _mm256_permute2f128_pd(temp3, temp4, 0b00110001);
+    __m256d res = _mm256_add_pd(temp5, temp6);
+    _mm256_maskstore_pd(c + 6, mask0111, res);
+  }
+}
+
 
 void init() {
-  dummyfile = tmpfile();
+  dummyfile = fopen("/dev/null", "w");
   mask0111 = _mm256_set_epi64x(0, ULLONG_MAX, ULLONG_MAX, ULLONG_MAX);
-  gatherMask036 = _mm256_set_epi64x(0, 64, 32, 0);
-  gatherMask147 = _mm256_set_epi64x(0, 72, 40, 8);
-  gatherMask258 = _mm256_set_epi64x(0, 80, 48, 16);
+  gatherMask036 = _mm256_set_epi64x(0, 48, 24, 0);
+  gatherMask147 = _mm256_set_epi64x(0, 56, 32, 8);
+  gatherMask258 = _mm256_set_epi64x(0, 64, 40, 16);
+  srand(clock());
 }
 
 int main (int argc, char **argv) {
@@ -319,7 +379,6 @@ int main (int argc, char **argv) {
   cout << "verify\n"
        << verify<vec4d, vec4d, vec4d>(vec3adds, vec3addv, comp, rand, rand)
        << verify<vec3d, vec3d, vec3d>(vec3adds, vec3addvmask, comp, rand, rand)
-      // << verify<vec4d, vec4d, vec4d>(vec3adds, vec3addvaligned, comp, rand, rand)
        << verify<vec3d, vec3d, vec1d>(vec3dots, vec3dotv, comp1, rand, rand)
        << verify<vec3d, vec3d, vec1d>(vec3dots, vec3dotv2, comp1, rand, rand)
        << verify<vec3d, vec3d, vec1d>(vec3dots, vec3dotv3, comp1, rand, rand)
@@ -327,14 +386,14 @@ int main (int argc, char **argv) {
        << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vdot, comp, rand, rand)
        << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vfused1, comp, rand, rand)
        << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vfused2, comp, rand, rand)
-       << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vbroadcast, comp, rand, rand)
+      // << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vbroadcast, comp, rand, rand)
+       << verify<mat33d, mat33d, mat33d>(mat33dmuls, mat33dmulvdot, comp, rand, rand);
               ;
 
   cout << "\nbenchmark\n";
   benchmark(vec3d, vec3d, vec3d, vec3adds, rand, rand);
   benchmark(vec4d, vec4d, vec4d, vec3addv, rand, rand);
   benchmark(vec3d, vec3d, vec3d, vec3addvmask, rand, rand);
- // benchmark(vec4d, vec4d, vec4d, vec3addvaligned, rand, rand);
   cout << endl;
   benchmark(vec3d, vec3d, vec1d, vec3dots, rand, rand);
   benchmark(vec3d, vec3d, vec1d, vec3dotv, rand, rand);
@@ -348,8 +407,10 @@ int main (int argc, char **argv) {
   benchmark(mat33d, vec3d, vec3d, mat33vec3vdot, rand, rand);
   benchmark(mat33d, vec3d, vec3d, mat33vec3vfused1, rand, rand);
   benchmark(mat33d, vec3d, vec3d, mat33vec3vfused2, rand, rand);
-  benchmark(mat33d, vec3d, vec3d, mat33vec3vbroadcast, rand, rand);
-
+ // benchmark(mat33d, vec3d, vec3d, mat33vec3vbroadcast, rand, rand);
+  cout << endl;
+  benchmark(mat33d, mat33d, mat33d, mat33dmuls, rand, rand);
+  benchmark(mat33d, mat33d, mat33d, mat33dmulvdot, rand, rand);
 
   fclose(dummyfile);
   return 0;

@@ -8,7 +8,8 @@ else
 endif
 
 all:
-	rm a.out
-	rm *.s
 	$(CC) $(CFLAGS) main.cpp
 	$(CC) $(CFLAGS) -S main.cpp
+
+clean:
+	rm a.out
