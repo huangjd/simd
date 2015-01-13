@@ -1,3 +1,14 @@
+CC := g++
+CFLAGS := -mavx2 -std=c++11
+
+ifeq ($(DEBUG), 1)
+	CFLAGS += -O0 -g
+else
+	CFLAGS += -O3 -DNDEBUG
+endif
+
 all:
-	g++ -mavx2 -O3 -std=c++11 main.cpp
-	g++ -mavx2 -O3 -std=c++11 main.cpp -S
+	rm a.out
+	rm *.s
+	$(CC) $(CFLAGS) main.cpp
+	$(CC) $(CFLAGS) -S main.cpp
