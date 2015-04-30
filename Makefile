@@ -12,4 +12,4 @@ all:
 	$(CC) $(CFLAGS) -S main.cpp
 
 clean:
-	rm a.out
+	rm a.out main.s
