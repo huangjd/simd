@@ -123,16 +123,12 @@ clock_t _benchmark(void(*f)(inA, inB, out), void(*randA)(inA), void(*randB)(inB)
 #define benchmark(inA, inB, out, f, randA, randB) \
   cout << #f << ": " << _benchmark<inA, inB, out>(f, randA, randB) << endl
 
-//static inline void vec3adds(vec3d a, vec3d b, vec3d c) __attribute__((optimize("-O0")));
-
 static inline
 void vec3adds(vec3d a, vec3d b, vec3d c) {
   for (int i = 0; i < 3; i++) {
     c[i] = a[i] + b[i];
   }
 }
-
-//static inline void vec3addsunroll(vec3d a, vec3d b, vec3d c) __attribute__((optimize("-O0")));
 
 static inline
 void vec3addsunroll(vec3d a, vec3d b, vec3d c) {
@@ -163,8 +159,6 @@ void vec3addvaligned(vec4d a, vec4d b, vec4d c) {
   _mm256_store_pd(c, tempc);
 }
 
-//static inline void vec3dots(vec3d a, vec3d b, vec1d c) __attribute__((optimize("-O0")));
-
 static inline
 void vec3dots(vec3d a, vec3d b, vec1d c) {
   double temp = 0;
@@ -173,8 +167,6 @@ void vec3dots(vec3d a, vec3d b, vec1d c) {
   }
   c[0] = temp;
 }
-
-//static inline void vec3dotsunroll(vec3d a, vec3d b, vec1d c) __attribute__((optimize("-O0")));
 
 static inline
 void vec3dotsunroll(vec3d a, vec3d b, vec1d c) {
@@ -204,14 +196,14 @@ void vec3dotv2(vec3d a, vec3d b, vec1d c) {
 
 static inline
 void vec3dotv3(vec3d a, vec3d b, vec1d c) {
-  __m256d temp = _mm256_mul_pd(_mm256_loadu_pd(a), _mm256_loadu_pd(b));
-  __m256d temp2 = _mm256_hadd_pd(temp, temp);
-  __m128d hi = _mm256_extractf128_pd(temp, 1);
-  __m128d lo = _mm256_extractf128_pd(temp2, 0);
-  _mm_maskstore_pd(c, _mm_set_epi64x(0, ULLONG_MAX), _mm_add_sd(hi, lo));
-}
+  __m256d s = _mm256_mul_pd(_mm256_loadu_pd(a), _mm256_loadu_pd(b));
+  __m256d s1 = _mm256_permute4x64_pd(s, 0b00000010);
+  __m256d s2 = _mm256_permute_pd(s, 0b0001);
+  __m256d sum = _mm256_add_pd(_mm256_add_pd(s, s1), s2);
 
-//static inline void vec3exts(vec3d a, vec3d b, mat33d c) __attribute__((optimize("-O0")));
+  __m128d sum1 = _mm256_castpd256_pd128(sum);
+  _mm_store_sd(c, sum1);
+}
 
 static inline
 void vec3exts(vec3d a, vec3d b, mat33d c) {
@@ -221,8 +213,6 @@ void vec3exts(vec3d a, vec3d b, mat33d c) {
     }
   }
 }
-
-//static inline void vec3extsunroll(vec3d a, vec3d b, mat33d c) __attribute__((optimize("-O0")));
 
 inline
 void vec3extsunroll(vec3d a, vec3d b, mat33d c) {
@@ -245,8 +235,6 @@ void vec3extv(vec3d a, vec3d b, mat33d c) {
   _mm256_storeu_pd(c+6, _mm256_mul_pd(_mm256_set1_pd(a[2]), temp));
 }
 
-//static inline void mat33vec3s(mat33d a, vec3d b, vec3d c) __attribute__((optimize("-O0")));
-
 static inline
 void mat33vec3s(mat33d a, vec3d b, vec3d c) {
   for (int i = 0; i < 3; i++) {
@@ -257,8 +245,6 @@ void mat33vec3s(mat33d a, vec3d b, vec3d c) {
     c[i] = temp;
   }
 }
-
-//static inline void mat33vec3sunroll(mat33d a, vec3d b, vec3d c) __attribute__((optimize("-O0")));
 
 static inline
 void mat33vec3sunroll(mat33d a, vec3d b, vec3d c) {
@@ -306,24 +292,32 @@ void mat33vec3vfused1(mat33d a, vec3d b, vec3d c) {
 }
 
 inline
-void mat33vec3vfused2(mat33d a, vec3d b, vec3d c) {
-  __m256d tempb = _mm256_loadu_pd(b);
-  __m256d temp0 = _mm256_mul_pd(tempb, _mm256_maskload_pd(a, mask0111));
-  __m256d temp1 = _mm256_mul_pd(tempb, _mm256_maskload_pd(a+3, mask0111));
-  __m256d temp2 = _mm256_mul_pd(tempb, _mm256_maskload_pd(a+6, mask0111));
-  __m256d temp3 = _mm256_permute2f128_pd(temp0, temp2, 0b00100001);
-  __m256d temp4 = _mm256_permute2f128_pd(temp1, temp2, 0b00100001);
-  temp4 = _mm256_permute_pd(temp4, 0b0101);
-  temp0 = _mm256_hadd_pd(temp0, temp0);
-  temp1 = _mm256_hadd_pd(temp1, temp1);
-  temp2 = _mm256_blend_pd(temp2, temp0, 0b0001);
-  temp2 = _mm256_blend_pd(temp2, temp1, 0b0010);
-  temp2 = _mm256_add_pd(temp2, temp3);
-  temp2 = _mm256_add_pd(temp2, temp4);
-  _mm256_maskstore_pd(c, mask0111, temp2);
-}
+void mat33vec3vshuf(mat33d a, vec3d b, vec3d c) {
+  __m256d _0123 = _mm256_loadu_pd(b);
+  __m256d abcd = _mm256_loadu_pd(a);
+  __m256d efgh = _mm256_loadu_pd(a + 4);
+  __m256d iiii = _mm256_broadcast_sd(a + 8);
 
-//static inline void mat33dmuls(mat33d a, mat33d b, mat33d c) __attribute__((optimize("-O0")));
+  __m256d _2110 = _mm256_permute4x64_pd(_0123, 0b00010110);
+
+  __m256d ebgx = _mm256_shuffle_pd(efgh, abcd, 0b0010);
+  __m256d _110x = _mm256_shuffle_pd(_2110, _0123, 0b0111);
+  __m256d c1 = _mm256_mul_pd(ebgx, _110x);
+
+  __m256d fahx = _mm256_shuffle_pd(efgh, abcd, 0b0101);
+  __m256d _201x = _mm256_shuffle_pd(_2110, _0123, 0b0000);
+  __m256d c2 = _mm256_mul_pd(fahx, _201x);
+
+  __m256d dcxx = _mm256_permute4x64_pd(abcd, 0b00001011);
+  __m256d dcix = _mm256_blend_pd(dcxx, iiii, 0b0100);
+  __m256d _022x = _mm256_shuffle_pd(_0123, _2110, 0b0000);
+  __m256d c3 = _mm256_mul_pd(dcix, _022x);
+
+  __m256d sum = _mm256_add_pd(_mm256_add_pd(c1, c2), c3);
+
+  sum = _mm256_permute_pd(sum, 0b0001);
+  _mm256_maskstore_pd(c, _mm256_set_epi64x(0, 1ull<<63, 1ull<<63, 11ull<<63), sum);
+}
 
 static inline
 void mat33dmuls(mat33d a, mat33d b, mat33d c) {
@@ -338,8 +332,6 @@ void mat33dmuls(mat33d a, mat33d b, mat33d c) {
   }
 }
 
-//static inline void mat33dmulsunroll(mat33d a, mat33d b, mat33d c) __attribute__((optimize("-O0")));
-
 static inline
 void mat33dmulsunroll(mat33d a, mat33d b, mat33d c) {
   c[0*3+0] = a[0*3+0] * b[0*3+0] + a[0*3+1] * b[1*3+0] + a[0*3+2] * b[2*3+0];
@@ -353,52 +345,6 @@ void mat33dmulsunroll(mat33d a, mat33d b, mat33d c) {
   c[2*3+0] = a[2*3+0] * b[0*3+0] + a[2*3+1] * b[1*3+0] + a[2*3+2] * b[2*3+0];
   c[2*3+1] = a[2*3+0] * b[0*3+1] + a[2*3+1] * b[1*3+1] + a[2*3+2] * b[2*3+1];
   c[2*3+2] = a[2*3+0] * b[0*3+2] + a[2*3+1] * b[1*3+2] + a[2*3+2] * b[2*3+2];
-}
-
-static inline
-void mat33dmulvdot(mat33d _a, mat33d _b, mat33d _c) {
-  double *a = (double*)_a;
-  double *b = (double*)_b;
-  double *c = (double*)_c;
-
-  __m256d a0 = _mm256_maskload_pd(a, mask0111);
-  __m256d a1 = _mm256_maskload_pd(a + 3, mask0111);
-  __m256d a2 = _mm256_maskload_pd(a + 6, mask0111);
-  __m256d b0 = _mm256_i64gather_pd(b, gatherMask036, 1);
-  __m256d b1 = _mm256_i64gather_pd(b, gatherMask147, 1);
-  __m256d b2 = _mm256_i64gather_pd(b, gatherMask258, 1);
-
-  {
-    __m256d temp0 = _mm256_mul_pd(a0, b0);
-    __m256d temp1 = _mm256_mul_pd(a0, b1);
-    __m256d temp2 = _mm256_mul_pd(a0, b2);
-    __m256d temp3 = _mm256_hadd_pd(temp0, temp1);
-    __m256d temp4 = _mm256_hadd_pd(temp2, temp2);
-    __m256d temp5 = _mm256_permute2f128_pd(temp3, temp4, 0b00100000);
-    __m256d temp6 = _mm256_permute2f128_pd(temp3, temp4, 0b00110001);
-    __m256d res = _mm256_add_pd(temp5, temp6);
-    _mm256_storeu_pd(c, res);
-  } {
-    __m256d temp0 = _mm256_mul_pd(a1, b0);
-    __m256d temp1 = _mm256_mul_pd(a1, b1);
-    __m256d temp2 = _mm256_mul_pd(a1, b2);
-    __m256d temp3 = _mm256_hadd_pd(temp0, temp1);
-    __m256d temp4 = _mm256_hadd_pd(temp2, temp2);
-    __m256d temp5 = _mm256_permute2f128_pd(temp3, temp4, 0b00100000);
-    __m256d temp6 = _mm256_permute2f128_pd(temp3, temp4, 0b00110001);
-    __m256d res = _mm256_add_pd(temp5, temp6);
-    _mm256_storeu_pd(c + 3, res);
-  } {
-    __m256d temp0 = _mm256_mul_pd(a2, b0);
-    __m256d temp1 = _mm256_mul_pd(a2, b1);
-    __m256d temp2 = _mm256_mul_pd(a2, b2);
-    __m256d temp3 = _mm256_hadd_pd(temp0, temp1);
-    __m256d temp4 = _mm256_hadd_pd(temp2, temp2);
-    __m256d temp5 = _mm256_permute2f128_pd(temp3, temp4, 0b00100000);
-    __m256d temp6 = _mm256_permute2f128_pd(temp3, temp4, 0b00110001);
-    __m256d res = _mm256_add_pd(temp5, temp6);
-    _mm256_maskstore_pd(c + 6, mask0111, res);
-  }
 }
 
 static inline
@@ -454,7 +400,7 @@ void mat33dmulvshuf(mat33d _a, mat33d _b, mat33d _c) {
   __m256d c8 = _mm256_permute_pd(c7, 0b1111);
   __m256d c9 = _mm256_mul_pd(iiii, _8888);
 
-  _mm256_storeu_pd(c + 8, _mm256_add_pd(_mm256_add_pd(c7, c8), c9));
+  _mm256_maskstore_pd(c + 8, _mm256_set_epi64x(0, 0, 0, 1ull<<63), _mm256_add_pd(_mm256_add_pd(c7, c8), c9));
 }
 
 void init() {
@@ -486,9 +432,8 @@ int main (int argc, char **argv) {
         << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3sunroll, comp<3>, rand, rand)
         << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vdot, comp<3>, rand, rand)
         << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vfused1, comp<3>, rand, rand)
-        << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vfused2, comp<3>, rand, rand)
+        << verify<mat33d, vec3d, vec3d>(mat33vec3s, mat33vec3vshuf, comp<3>, rand, rand)
         << verify<mat33d, mat33d, mat33d>(mat33dmuls, mat33dmulsunroll, comp, rand, rand)
-        << verify<mat33d, mat33d, mat33d>(mat33dmuls, mat33dmulvdot, comp, rand, rand)
         << verify<mat33d, mat33d, mat33d>(mat33dmuls, mat33dmulvshuf, comp<9>, rand, rand)
         ;
   }
@@ -520,14 +465,13 @@ int main (int argc, char **argv) {
     benchmark(mat33d, vec3d, vec3d, mat33vec3sunroll, rand, rand);
     benchmark(mat33d, vec3d, vec3d, mat33vec3vdot, rand, rand);
     benchmark(mat33d, vec3d, vec3d, mat33vec3vfused1, rand, rand);
-    benchmark(mat33d, vec3d, vec3d, mat33vec3vfused2, rand, rand);
+    benchmark(mat33d, vec3d, vec3d, mat33vec3vshuf, rand, rand);
     cout << endl;
   }
 
   if (1) {
     benchmark(mat33d, mat33d, mat33d, mat33dmuls, rand, rand);
     benchmark(mat33d, mat33d, mat33d, mat33dmulsunroll, rand, rand);
-    benchmark(mat33d, mat33d, mat33d, mat33dmulvdot, rand, rand);
     benchmark(mat33d, mat33d, mat33d, mat33dmulvshuf, rand, rand);
   }
 
